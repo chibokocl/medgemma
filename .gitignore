@@ -44,3 +44,16 @@ venv.bak/
 medgemma-original/
 output/
 .pytest_cache/
+
+# Scratch/dev scripts
+generate_resources.py
+inject_resources.py
+resources.rb
+medgemma.rb
+requirements.txt
+
+# Logs
+*.log
+
+# Test fixtures
+test_xray.jpg
