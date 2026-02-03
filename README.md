@@ -29,7 +29,28 @@ MedGemma is a command-line tool and Python library that runs Google's [MedGemma 
 pip install medgemma
 ```
 
-### 2. Download the model
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv pip install medgemma
+```
+
+### 2. Hugging Face authentication
+
+The model weights are hosted on Hugging Face under [google/medgemma-4b-it](https://huggingface.co/google/medgemma-4b-it). Before downloading, you need to:
+
+1. Create a [Hugging Face account](https://huggingface.co/join) (free)
+2. Visit the [model page](https://huggingface.co/google/medgemma-4b-it) and accept Google's license agreement
+3. Log in locally:
+
+```bash
+pip install huggingface-hub
+huggingface-cli login
+```
+
+You only need to do this once.
+
+### 3. Download the model
 
 ```bash
 medgemma setup
@@ -37,7 +58,7 @@ medgemma setup
 
 This downloads the MedGemma 4B model from Hugging Face, converts it to 4-bit quantized MLX format, and caches it at `~/.medgemma/model`. You only need to do this once.
 
-### 3. Ask a question
+### 4. Ask a question
 
 ```bash
 medgemma ask "What are the common symptoms of type 2 diabetes?"
@@ -241,6 +262,7 @@ MedGemma requires an Apple Silicon Mac (M1/M2/M3/M4). It cannot run on Intel Mac
 
 ### Model download fails
 
+- Make sure you've accepted the license at [google/medgemma-4b-it](https://huggingface.co/google/medgemma-4b-it) and logged in with `huggingface-cli login`
 - Check your internet connection
 - Ensure you have ~4 GB of free disk space
 - Try again with `medgemma setup --force`
