@@ -28,7 +28,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 class AskRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=8000)
+    prompt: str = Field(min_length=1, max_length=16000)
     image_base64: str | None = Field(
         default=None, description="Base64-encoded image (PNG/JPEG/WebP)."
     )
