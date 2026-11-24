@@ -57,3 +57,14 @@ requirements.txt
 
 # Test fixtures
 test_xray.jpg
+
+# Local notes / working docs (not versioned)
+*.local.md
+docs/*.local.md
+
+# Deploy secrets
+deploy/*.env
+
+# Research outputs
+research_notes/
+reports/

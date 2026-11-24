@@ -1,0 +1,26 @@
+[Unit]
+Description=MedGemma API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=medgemma
+Group=medgemma
+WorkingDirectory=/opt/medgemma
+EnvironmentFile=/etc/medgemma/medgemma.env
+Environment=HF_HOME=/var/lib/medgemma/hf
+ExecStart=/opt/medgemma/venv/bin/medgemma serve
+Restart=on-failure
+RestartSec=5
+# Model load can take a minute or two on first start.
+TimeoutStartSec=600
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/medgemma
+
+[Install]
+WantedBy=multi-user.target

@@ -17,3 +17,9 @@ def test_info_command():
     result = runner.invoke(cli, ["info"])
     assert result.exit_code == 0
     assert "Cache directory" in result.output
+
+
+def test_serve_help():
+    result = CliRunner().invoke(cli, ["serve", "--help"])
+    assert result.exit_code == 0
+    assert "--port" in result.output

@@ -1,0 +1,19 @@
+services:
+  medgemma:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"   # put nginx/Caddy in front for TLS
+    volumes:
+      - hf-cache:/data/hf       # model weights persist across rebuilds
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  hf-cache:

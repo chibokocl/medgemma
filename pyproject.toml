@@ -5,27 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "medgemma"
 dynamic = ["version"]
-description = "Medical AI on Apple Silicon – MedGemma 1.5 4B via MLX"
+description = "MedGemma medical AI – local CLI/library (MLX) and Linux HTTP server (CUDA)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "chiboko" }]
-keywords = ["medical", "ai", "mlx", "apple-silicon", "medgemma"]
+keywords = ["medical", "ai", "mlx", "cuda", "api", "medgemma"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Healthcare Industry",
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "mlx-vlm>=0.3.10",
     "click>=8.0",
+    "mlx-vlm>=0.3.10; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-mock"]
+# Linux inference (NVIDIA GPU; also runs on CPU, slowly)
+cuda = ["torch>=2.4", "transformers>=4.50", "accelerate>=0.30", "pillow"]
+# HTTP API server
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "pillow"]
+dev = ["pytest>=7.0", "pytest-mock", "httpx"]
 
 [project.scripts]
 medgemma = "medgemma.cli:cli"
@@ -35,3 +40,6 @@ path = "src/medgemma/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/medgemma"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

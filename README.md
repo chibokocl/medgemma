@@ -1,6 +1,6 @@
 # medgemma
 
-**Medical AI on Apple Silicon — MedGemma 4B via MLX**
+**Medical AI — MedGemma 4B locally on Apple Silicon (MLX) or served from a Linux GPU box (HTTP API)**
 
 [![PyPI version](https://img.shields.io/pypi/v/medgemma)](https://pypi.org/project/medgemma/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
@@ -17,6 +17,7 @@
 - [What is this?](#what-is-this)
 - [Features](#features)
 - [Requirements](#requirements)
+- [Deploy on a Linux server](#deploy-on-a-linux-server)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
 - [Python API](#python-api)
@@ -46,7 +47,7 @@ Ask medical questions, analyze medical images, and get evidence-based responses 
 
 ## Requirements
 
-- **Apple Silicon Mac** (M1, M2, M3, or M4)
+- **Apple Silicon Mac** (M1–M4) for local use — or a **Linux + NVIDIA GPU** server, see [Deploy](#deploy-on-a-linux-server)
 - **Python 3.10** or newer
 - **~4 GB free disk space** for the quantized model weights
 - **Hugging Face account** with the MedGemma license accepted (free — see setup below)
@@ -122,6 +123,75 @@ screenings are recommended, especially if risk factors are present.
 ```bash
 medgemma ask "Describe this chest X-ray" --image chest_xray.png
 ```
+
+---
+
+## Deploy on a Linux server
+
+Requirements: Linux, an NVIDIA GPU with ≥ 12 GB VRAM (bf16; CPU works but is very slow), NVIDIA drivers, Python 3.10+, and a Hugging Face token with the [MedGemma license](https://huggingface.co/google/medgemma-4b-it) accepted.
+
+### Option A — Docker (recommended)
+
+```bash
+git clone https://github.com/chibokocl/medgemma && cd medgemma
+cp deploy/.env.example .env && $EDITOR .env      # set HF_TOKEN and MEDGEMMA_API_KEY
+docker compose up -d --build
+curl localhost:8000/readyz                        # 503 until the model has loaded
+```
+
+Needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/). Weights are cached in the `hf-cache` volume.
+
+### Option B — systemd
+
+```bash
+sudo useradd --system --home /var/lib/medgemma --create-home medgemma
+sudo python3 -m venv /opt/medgemma/venv
+sudo /opt/medgemma/venv/bin/pip install "medgemma[cuda,server]"
+sudo install -d -m 750 -o root -g medgemma /etc/medgemma
+sudo install -m 640 -g medgemma deploy/.env.example /etc/medgemma/medgemma.env   # edit it
+sudo cp deploy/medgemma.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now medgemma
+journalctl -u medgemma -f
+```
+
+Put nginx in front for TLS using [`deploy/nginx.conf`](deploy/nginx.conf) (SSE buffering already disabled).
+
+### API
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/healthz` | – | Liveness |
+| GET | `/readyz` | – | 200 once the model is loaded, else 503 |
+| POST | `/v1/ask` | Bearer | JSON response with text + stats |
+| POST | `/v1/ask/stream` | Bearer | Server-Sent Events (`data: {"text": ...}`, then `data: [DONE]`) |
+| GET | `/docs` | – | Interactive OpenAPI docs |
+
+```bash
+curl https://api.example.com/v1/ask \
+  -H "Authorization: Bearer $MEDGEMMA_API_KEY" -H "Content-Type: application/json" \
+  -d '{"prompt": "What are common causes of microcytic anemia?", "max_tokens": 300}'
+
+# with an image
+B64=$(base64 -w0 xray.jpg)
+curl https://api.example.com/v1/ask -H "Authorization: Bearer $MEDGEMMA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"prompt\": \"Describe this image\", \"image_base64\": \"$B64\"}"
+```
+
+### Configuration (environment)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MEDGEMMA_API_KEY` | *(unset = no auth)* | Bearer token required on `/v1/*` |
+| `MEDGEMMA_HOST` / `MEDGEMMA_PORT` | `127.0.0.1` / `8000` | Bind address |
+| `MEDGEMMA_BACKEND` | `auto` | `mlx`, `transformers` |
+| `MEDGEMMA_MODEL_ID` | `google/medgemma-4b-it` | HF repo or local path |
+| `MEDGEMMA_PRELOAD` | `1` | Load model at startup |
+| `MEDGEMMA_MAX_TOKENS_LIMIT` | `2048` | Server-side cap on `max_tokens` |
+| `MEDGEMMA_MAX_IMAGE_MB` | `10` | Max decoded image size |
+| `HF_TOKEN`, `HF_HOME` | | Hugging Face auth / cache location |
+
+Generation is serialised per GPU (one request at a time; others queue). Always set `MEDGEMMA_API_KEY` and terminate TLS before exposing the server publicly.
 
 ---
 
@@ -312,23 +382,22 @@ medgemma ask "What is hypertension?" --json
 ## Project Structure
 
 ```
-medgemma-project/
+medgemma/
 ├── src/medgemma/
-│   ├── __init__.py      # Public API: MedGemma, Response, __version__
-│   ├── __main__.py      # Allows `python -m medgemma`
-│   ├── _compat.py       # Platform check (Apple Silicon guard)
-│   ├── _version.py      # Single source of truth for version string
-│   ├── cli.py           # Click CLI (ask, setup, info commands)
-│   ├── client.py        # MedGemma class and Response dataclass
-│   ├── config.py        # Constants: cache path, HF repo, defaults
-│   ├── convert.py       # Model download and MLX conversion logic
-│   └── model.py         # Model loading, caching, and info helpers
-├── tests/
-│   ├── test_cli.py
-│   ├── test_client.py
-│   └── test_config.py
-├── pyproject.toml
-└── README.md
+│   ├── backends/
+│   │   ├── mlx.py           # Apple Silicon inference (mlx-vlm)
+│   │   └── transformers.py  # Linux/CUDA inference (transformers)
+│   ├── cli.py               # ask, setup, info, serve
+│   ├── client.py            # MedGemma class (public API)
+│   ├── config.py            # Defaults + MEDGEMMA_* env settings
+│   ├── convert.py           # MLX download/quantise
+│   ├── model.py             # Lazy, thread-safe backend singleton
+│   ├── server.py            # FastAPI app
+│   └── types.py             # Response dataclass
+├── deploy/                  # .env.example, systemd unit, nginx config
+├── Dockerfile
+├── docker-compose.yml
+└── tests/
 ```
 
 ---
@@ -368,9 +437,9 @@ Artifacts are written to `dist/`.
 
 ## Troubleshooting
 
-### "Not running on Apple Silicon"
+### Linux: ImportError for torch or transformers
 
-MedGemma requires an Apple Silicon Mac (M1/M2/M3/M4). The MLX framework only supports Apple's ARM-based chips. It cannot run on Intel Macs or other platforms.
+On Linux the `transformers` backend is used automatically; install it with `pip install "medgemma[cuda,server]"`. Force a backend with `MEDGEMMA_BACKEND=mlx|transformers`.
 
 ### Model download fails
 
