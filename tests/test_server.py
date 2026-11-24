@@ -72,6 +72,14 @@ def test_ask():
     assert fake.last["max_tokens"] == 100  # clamped
 
 
+def test_ask_accepts_long_rag_prompt_but_caps_at_16000():
+    c, fake = _client()
+    with c:
+        assert c.post("/v1/ask", json={"prompt": "x" * 16000}).status_code == 200
+        assert c.post("/v1/ask", json={"prompt": "x" * 16001}).status_code == 422
+    assert len(fake.last["prompt"]) == 16000
+
+
 def test_ask_with_image():
     c, fake = _client()
     with c:
